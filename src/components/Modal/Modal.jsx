@@ -26,7 +26,8 @@ export class Modal extends Component {
 
     render() {
     const {overlay, modal} = styles;
-    const {src, alt} = this.props;
+    const {imgData} = this.props;
+    const {src, alt} = imgData;
 
     return (
       <div className={overlay} onClick={this.handleOverlayClick}>
