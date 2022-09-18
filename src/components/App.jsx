@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import styles from './App.module.css';
 import * as api from 'services/fetchImages';
 import { Searchbar } from './Searchbar/Searchbar';
@@ -7,97 +7,89 @@ import { Button } from './Button/Button';
 import { Loader } from './Loader/Loader';
 import { Modal } from './Modal/Modal';
 
-export class App extends Component {
-  state = {
-    images: [],
-    searchValue: '',
-    page: 1,
-    isLoading: false,
-    error: null,
-    foundImages: null,
-    currentLargeImg: null,
-  }
+export const App = () => {
 
-  setInitialParams = (searchValue) => {
-    if (searchValue === '') {
+  const [images, setImages] = useState([]);
+  const [searchValue, setSearchValue] = useState("");
+  const [page, setPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [totalImages, setTotalImages] = useState(0);
+  const [currentLargeImg, setCurrentLargeImg] = useState(null);
+
+  const setInitialParams = (query) => {
+    if (query === '') {
       return alert('Enter the search value!')
     }
 
-    if (searchValue === this.state.searchValue) {
+    if (query === searchValue) {
       return;
     }
 
-    this.setState({
-      images: [],
-      searchValue,
-      page: 1,
-    });
+    setImages([]);
+    setSearchValue(query);
+    setPage(1);
   }
 
-  loadMore = () => {
-    this.setState(({page}) => ({page: page + 1}));
+  const loadMore = () => {
+    setPage(page + 1);
   }
 
-  addImages = async (searchValue, page) => {
-    this.setState({ isLoading: true });
+  const addImages = useCallback(async () => {
+    setIsLoading(true);
 
     try {
-      const data = await api.fetchImages(searchValue, page);
-      const {hits: newImages, totalHits: foundImages} = data;
-
-      this.setState(oldState => ({
-        images: [...oldState.images, ...newImages],
-      }));
-
-      if (foundImages !== this.state.foundImages) {
-        this.setState({ foundImages });
+      if (!searchValue) {
+        return;
       }
-    } catch (error) {
-      this.setState({ error })
+
+      const data = await api.fetchImages(searchValue, page);
+      const { hits: newImages, totalHits } = data;
+
+      setImages(oldImages => [...oldImages, ...newImages]);
+      setTotalImages(totalHits);
+    } catch (err) {
+      setError(err);
     } finally {
-      this.setState({ isLoading: false });
+      setIsLoading(false);
     }
+  }, [searchValue, page],
+  );
+
+  const openModal = (src, alt) => {
+    setCurrentLargeImg({ src, alt });
   }
 
-  openModal = (src, alt) => {
-    this.setState(state => ({...state, currentLargeImg: {src, alt}}));
+  const closeModal = () => {
+    setCurrentLargeImg(null);
   }
 
-  closeModal = (evt) => {
-    this.setState({currentLargeImg: null});
-  }
+  useEffect(() => {
+    addImages();
+  }, [addImages]);
 
-  componentDidUpdate(_, prevState) {
-    if (prevState.page !== this.state.page || prevState.searchValue !== this.state.searchValue) {
-      const {searchValue, page} = this.state;
-      this.addImages(searchValue, page);
-    }
-  }
+  const { app } = styles;
 
-  render() {
-    const {app} = styles;
-    const {images, isLoading, error, foundImages, currentLargeImg} = this.state;
-
-    return (
-      <div className={app}>
-        <Searchbar onSubmit={this.setInitialParams}/>
-        {error && <p>Whoops, something went wrong: {error.message}</p>}
-        {isLoading && <Loader />}
-        {images.length > 0 && 
-          <>
-            <ImageGallery 
-              items={images} 
-              openModal={this.openModal} 
-            />
-            {images.length < foundImages && 
-              <Button loadMore={this.loadMore} />
-            }
-          </>
-        }
-        {currentLargeImg && <Modal closeModal={this.closeModal} imgData={currentLargeImg}/>}
-      </div>
-    );
-  }
+  return (
+    <div className={app}>
+      <Searchbar onSubmit={setInitialParams} />
+      {error && <p>Whoops, something went wrong: {error.message}</p>}
+      {isLoading && <Loader />}
+      {images.length > 0 &&
+        <>
+          <ImageGallery
+            items={images}
+            openModal={openModal}
+          />
+          {images.length < totalImages &&
+            <Button loadMore={loadMore} />
+          }
+        </>
+      }
+      {currentLargeImg && <Modal closeModal={closeModal} imgData={currentLargeImg} />}
+    </div>
+  );
 };
+
 
 export default App;
